@@ -1,47 +1,33 @@
-use anyhow::{Context, Result};
+// FUCK THIS PROJECT THIS SHIT IS STUPID AS FUCK
+// WHY IS IT SO DIFFIFULT JUST TO SERVER SOME STATIC HTML AND CSS
+// I GIVE UP THIS PROJECT CAN GO FUCK ITSELF
+
 use askama::Template;
-use axum::{
-    http::StatusCode,
-    response::{Html, IntoResponse, Response},
-    routing::get,
-    Router,
-};
-use tracing::info;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use axum::{routing::get, Router};
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "tokiowebserver=debug".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+async fn main() {
+    // build our application with a single route
+    println!(
+        "{}/assets",
+        std::env::current_dir().unwrap().to_str().unwrap()
+    );
+    let app = Router::new()
+        .nest("/api", Router::new().route("/hello", get(say_hello)))
+        .route("/", get(hello_world))
+        .nest_service(
+            "/assets",
+            tower_http::services::ServeDir::new(format!(
+                "{}/assets",
+                std::env::current_dir().unwrap().to_str().unwrap()
+            )),
+        );
 
-    info!("tracing initialized");
-
-    let router = Router::new()
-        .route("/", get(hello))
-        .route("/hello/:name", get(hello));
-
-    info!("Router initialized");
-
-    let tcp_listener = tokio::net::TcpListener::bind("127.0.0.1:7878")
+    // run our app with hyper, listening globally on port 3000
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:7878")
         .await
         .unwrap();
-    axum::serve(tcp_listener, router)
-        .await
-        .context("error while starting server");
-
-    Ok(())
-}
-
-async fn hello() -> impl IntoResponse {
-    let template = HelloTemplate {
-        name: "from a rust server",
-    };
-    HtmlTemplate(template)
+    axum::serve(listener, app).await.unwrap();
 }
 
 #[derive(Template)]
@@ -50,19 +36,10 @@ struct HelloTemplate<'a> {
     name: &'a str,
 }
 
-struct HtmlTemplate<T>(T);
+async fn say_hello() -> &'static str {
+    "Hello"
+}
 
-impl<T> IntoResponse for HtmlTemplate<T>
-where
-    T: Template,
-{
-    fn into_response(self) -> Response {
-        match self.0.render() {
-            Ok(html) => Html(html).into_response(),
-            Err(e) => {
-                StatusCode::INTERNAL_SERVER_ERROR;
-                format!("Error rendering template: {}", e).into_response()
-            }
-        }
-    }
+async fn hello_world() -> HelloTemplate<'static> {
+    return HelloTemplate { name: "world" };
 }

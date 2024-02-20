@@ -1,11 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>Posts</h1>
+  <h1>Comments</h1>
   <ul>
     {% for post in posts %}
       <li>
-        <p>{{ post.title}}</p>
+        <p>{{ post.Record.id}}</p>
+        <p>{{ posts.content}}</p>
+              
       </li>
     {% endfor %}
   </ul>
   {% endblock %}
+
+<h1>{{title}}</h1>

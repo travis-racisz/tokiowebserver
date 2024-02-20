@@ -9,9 +9,17 @@
   <body>
     <div id="content">
       {% block navbar %}<div>
-        <a href = "/home"> Home </a>
+        <a href = "/home"> home </a>
         <a href = "/about"> About </a>
         <a> Blog </a>
+  <ul>
+    {% for post in posts %}
+      <li>
+        <p>{{ post.id}}</p>
+              
+      </li>
+    {% endfor %}
+  </ul>
       </div> {% endblock %}
     </div>
   </body>

@@ -1,86 +1,48 @@
 use askama::Template;
-use axum::{routing::get, Router};
+use axum::{extract::Path, routing::get, Extension, Json, Router};
 use config::Config;
-use sqlx::{postgres::PgPool, types::chrono::NaiveDateTime};
-
+use database::Database;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::sync::Arc;
+use surrealdb::sql::Thing;
 pub mod config;
+pub mod database;
+
 #[tokio::main]
-async fn main() {
-    Config::set_env(); // read the .env file and set the environment variables
-
-    let database_url = std::env::var("DATABASE_URL") // get the database url from the environment
-        .expect("could not find database url, please check .env file and provide valid url");
-
-    let pool = PgPool::connect(&database_url)
-        .await
-        .expect("Could not connect to database, Check URL"); // create a connection pool
-
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    Config::set_env();
+    let db = Arc::new(Database::new().await?);
     let app = Router::new()
-        .route("/", get(get_base))
-        .route("/about", get(about))
-        .route("/home", get(home))
-        .nest_service(
-            "/assets",
-            tower_http::services::ServeDir::new(format!(
-                "{}/assets",
-                std::env::current_dir().unwrap().to_str().unwrap()
-            )),
-        );
+        .route("/post", get(get_post))
+        .layer(Extension(db));
 
-    // run our app with hyper, listening globally on port 3000
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:7878")
-        .await
-        .unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+    axum::serve(listener, app).await?;
+    Ok(())
 }
 
-#[derive(Template)]
-#[template(path = "base.html")]
-struct BaseTemplate<'a> {
-    title: &'a str,
-}
-
-#[derive(Template)]
-#[template(path = "home.html")]
-struct HTMLTemplate;
-
-async fn get_base() -> BaseTemplate<'static> {
-    return BaseTemplate {
-        title: "Rust Diablo",
-    };
-}
-
-async fn home() -> HTMLTemplate {
-    return HTMLTemplate;
-}
-#[derive(Template)]
-#[template(path = "about.html")]
-struct About<'a> {
-    title: &'a str,
-}
-
-async fn about() -> About<'static> {
-    About { title: "about" }
-}
-
-#[derive(Template)]
-#[template(path = "posts.html")]
-struct Posts {
-    title: String,
-    posts: Vec<Post>,
-}
-
+#[derive(Serialize, Deserialize, Debug)]
 struct Post {
-    id: i32,
     title: String,
     content: String,
-    created_at: NaiveDateTime,
 }
-
-async fn get_all_posts(pool: PgPool) {
-    let posts = sqlx::query!("SELECT * FROM posts where id = $1", 1)
-        .fetch_one(&pool)
-        .await
-        .expect("could not get post");
-    println!("{}:", posts.title);
+#[derive(Serialize, Deserialize, Debug)]
+struct Record {
+    id: Thing,
+}
+#[derive(Template)]
+#[template(path = "posts.html")]
+struct PostTemplate {
+    title: String,
+    posts: Vec<Record>,
+}
+#[axum::debug_handler]
+async fn get_post(Extension(db): Extension<Arc<Database>>) -> PostTemplate {
+    let result: Vec<Record> = db.db.select("posts").await.unwrap();
+    dbg!(&result);
+    PostTemplate {
+        title: "Posts!!!".to_string(),
+        posts: result,
+    }
 }

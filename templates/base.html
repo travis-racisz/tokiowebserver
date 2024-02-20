@@ -13,12 +13,8 @@
         <a href = "/about"> About </a>
         <a> Blog </a>
   <ul>
-    {% for post in posts %}
-      <li>
-        <p>{{ post.id}}</p>
-              
-      </li>
-    {% endfor %}
+    {% block content %}
+    {% endblock %}
   </ul>
       </div> {% endblock %}
     </div>

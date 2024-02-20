@@ -1,13 +1,13 @@
 use askama::Template;
-use axum::{extract::Path, routing::get, Extension, Json, Router};
+use axum::{routing::get, Extension, Router};
 use config::Config;
 use database::Database;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::sync::Arc;
 use surrealdb::sql::Thing;
-pub mod config;
-pub mod database;
+mod config;
+mod database;
+mod pages;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,6 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db = Arc::new(Database::new().await?);
     let app = Router::new()
         .route("/post", get(get_post))
+        .route("/about", get(pages::about::get_about))
         .layer(Extension(db));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
@@ -30,6 +31,7 @@ struct Post {
 #[derive(Serialize, Deserialize, Debug)]
 struct Record {
     id: Thing,
+    title: String,
 }
 #[derive(Template)]
 #[template(path = "posts.html")]
